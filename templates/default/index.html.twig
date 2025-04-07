@@ -1,0 +1,31 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Hello DefaultController!{% endblock %}
+
+{% block body %}
+<div class="row">
+    <div class="col my-5">
+        <div id="mouseLocation"></div>
+        <canvas height="768" width="1024" id="canvas" style="border: 1px solid;"></canvas>
+        <div>
+            Number of players
+            <input type="text" id="numPlayers" size="4" value="50">
+            Size of players
+            <input type="text" id="size" size="1" value="50">
+        </div>
+        <div>
+            <button id="stop" class="btn btn-primary"><i class="bi bi-pause"></i></button>
+            <button id="start" class="btn btn-primary"><i class="bi bi-play-fill"></i></button>
+            <button id="reset" class="btn btn-primary"><i class="bi bi-arrow-clockwise"></i></button>
+        </div>
+
+    </div>
+    <div class="col my-5">
+        <div id="debug"></div>
+    </div>
+</div>
+
+<script src="/js/rect.js"></script>
+<script src="/js/collider.js"></script>
+<script src="/js/unit.js"></script>
+<script src="/js/canvas.js"></script> {% endblock %}
