@@ -12,17 +12,21 @@ class Collider {
         startCollisionFunc = function () { console.log("onCollisionStart"); },
         stayCollisionFunc = function () { console.log("onCollisionStay"); },
         endCollisionFunc = function () { console.log("onCollisionEnd"); }) {
+        this.#stayCollisions = [];
         if (Rect.isValidRect(rect)) {
             this.#rect = new Rect(rect);
         } else {
             throw new Error('Invalid rect passed');
         }
-        this.#stayCollisions = [];
-        this.#id = Collider.#idCounter++;
-        this.#parent = parent;
+
+        if (parent && typeof (parent) == 'object') {
+            this.#parent = parent;
+            this.#parent.collider = this;
+        }
+
         this.#onCollisionStart = startCollisionFunc;
         this.#onCollisionStay = stayCollisionFunc;
-        this.#onCollisionEnd = endCollisionFunc;
+        //this.#onCollisionEnd = endCollisionFunc.bind(this);
     }
 
 
@@ -36,6 +40,10 @@ class Collider {
 
     get rect() {
         return this.#rect;
+    }
+
+    get stayCollisions() {
+        return this.#stayCollisions;
     }
 
     get onCollisionStart() {
@@ -54,55 +62,96 @@ class Collider {
         this.#parent = newParent;
     }
 
-    set onCollisionStart(newFunc = function () { console.log("onCollisionStart"); }) {
+    set onCollisionStart(newFunc) {
         this.#onCollisionStart = newFunc;
     }
 
-    set onCollisionStay(newFunc = function () { console.log("onCollisionStay"); }) {
+    set onCollisionStay(newFunc) {
         this.#onCollisionStay = newFunc;
     }
 
-    set onCollisionEnd(newFunc = function () { console.log("onCollisionEnd"); }) {
+    set onCollisionEnd(newFunc) {
         this.#onCollisionEnd = newFunc;
     }
 
 
     checkCollisions(checkTargets) {
         let currentCollisions = [];
+        let newCollisions = [];
+        let existingCollisions = [];
+
         for (let target of checkTargets) {
-            if (!this.#rect.isIntersecting(target.rect.getRect())) {
-                continue;
-            }
-            if (target === this) {
+            // Perform the intersection check once
+            let isIntersecting = this.#rect.isIntersecting(target.collider.rect.getRect());
+            if (!isIntersecting || target.collider === this) {
                 continue;
             }
             currentCollisions.push(target);
+        }
 
-            //First handle any new collisions
-            let newCollisions = currentCollisions.filter(target => !this.#stayCollisions.includes(target));
-            for (let collision of newCollisions) {
-                if (typeof (this.#onCollisionStart) == 'function') {
-                    this.#onCollisionStart(target);
-                }
+
+        // Classify collisions into new and existing
+        for (let target of currentCollisions) {
+            if (!this.#stayCollisions.includes(target)) {
+                newCollisions.push(target);
+            } else {
+                existingCollisions.push(target);
             }
+        }
 
-            //Then any collisions that are ongoing
-            let existingCollisions = currentCollisions.filter(target => this.#stayCollisions.includes(target));
-            for (let collision of existingCollisions) {
-                if (typeof (this.#onCollisionStay) == 'function') {
-                    this.#onCollisionStay(target);
-                }
+        // Handle new collisions
+        for (let collision of newCollisions) {
+            if (typeof this.#onCollisionStart === 'function') {
+                const direction = this.#calculateCollisionDirection(collision.collider.rect);
+                this.#onCollisionStart(collision);
             }
+        }
 
-            //Finally ended collisions.
-            let endedCollisions = this.#stayCollisions.filter(target => !currentCollisions.includes(target));
-            for (let collision of endedCollisions) {
-                if (typeof (this.#onCollisionEnd) == 'function') {
-                    this.#onCollisionEnd(target);
-                }
+        // Handle ongoing collisions
+        for (let collision of existingCollisions) {
+            if (typeof this.#onCollisionStay === 'function') {
+                const direction = this.#calculateCollisionDirection(collision.collider.rect);
+                this.#onCollisionStay(collision);
             }
+            this.ejectCollider(collision);
+        }
 
-            this.#stayCollisions = currentCollisions;
+        // Handle ended collisions
+        let endedCollisions = this.#stayCollisions.filter(target => !currentCollisions.includes(target));
+        for (let collision of endedCollisions) {
+            if (typeof this.#onCollisionEnd === 'function') {
+                const direction = this.#calculateCollisionDirection(collision.collider.rect);
+                this.#onCollisionEnd(direction);
+            }
+        }
+
+        // Update the stayCollisions array
+        this.#stayCollisions = currentCollisions;
+    }
+
+    ejectCollider(collidingObject) {
+
+    }
+    #calculateCollisionDirection(targetRect) {
+        // Get the centers of both rectangles
+        const thisCenter = this.#rect.center;
+        const targetCenter = targetRect.center;
+
+        // Calculate the differences in the center positions
+        const dx = targetCenter.x - thisCenter.x;
+        const dy = targetCenter.y - thisCenter.y;
+
+        // Calculate the combined half-widths and half-heights
+        const combinedHalfWidths = (this.#rect.width / 2) + (targetRect.width / 2);
+        const combinedHalfHeights = (this.#rect.height / 2) + (targetRect.height / 2);
+
+        // Determine the collision direction
+        if (Math.abs(dx) / combinedHalfWidths > Math.abs(dy) / combinedHalfHeights) {
+            return dx > 0 ? Geometry.right : Geometry.left;
+        } else {
+            return dy > 0 ? Geometry.down : Geometry.up;
         }
     }
+
+
 }

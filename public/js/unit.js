@@ -1,23 +1,19 @@
 class Unit {
     static #idCounter = 0;
-    static up = { x: 0, y: -1 };
-    static down = { x: 0, y: 1 };
-    static left = { x: -1, y: 0 };
-    static right = { x: 1, y: 0 };
     #id;
     #canvas;
     #rect;
     #collider;
     #color;
     #moveDir;
-    #moveSet;
     #viewDist;
 
-    constructor(canvas, rect, collider, viewDist = 5, color = null, moveSet = ['up', 'down', 'left', 'right']) {
+    constructor(canvas, rect, collider, moveDir, viewDist = 5, color = null) {
         this.#id = Unit.#idCounter++;
         this.#canvas = canvas;
         if (collider && typeof (collider) == 'object' && collider.constructor.name == 'Collider') {
             this.#collider = collider;
+            collider.parent = this;
         }
 
         if (Rect.isValidRect(rect)) {
@@ -27,11 +23,9 @@ class Unit {
             throw new Error("Invalid Rect");
 
         }
-
+        this.#moveDir = moveDir || Geometry.getRandomDirection();
         this.#viewDist = viewDist;
         this.#color = color || `#${Math.floor(Math.random() * 16777215).toString(16)}`;
-        this.#moveDir = Math.floor(Math.random() * moveSet.length);
-        this.#moveSet = moveSet;
 
     }
 
@@ -52,24 +46,18 @@ class Unit {
         return this.#color;
     }
 
-    get moveSet() {
-        return this.#moveSet;
-    }
-
     get moveDir() {
         return this.#moveDir;
-    }
-
-    get viewDist() {
-        return this.#viewDist;
     }
 
     get collider() {
         return this.#collider;
     }
 
-    set viewDist(newDist) {
-        this.#viewDist = newDist;
+    set moveDir(newMoveDir) {
+        if (newMoveDir && typeof (newMoveDir) == 'object') {
+            this.#moveDir = newMoveDir;
+        }
     }
 
     set canvas(newCanvas) {
@@ -77,55 +65,20 @@ class Unit {
     }
 
     set collider(newCollider) {
-        if (typeof (newCollider) == 'object' && collider.constructor.name == 'Collider') {
+        if (typeof (newCollider) == 'object' && newCollider.constructor.name == 'Collider') {
             this.#collider = newCollider;
         }
     }
 
-    set moveSet(newSet) {
-        if (Array.isArray(newSet)) {
-            this.#moveSet = newSet;
-        }
-    }
-
-    static getDirection(text) {
-        switch (text) {
-            case 'up':
-                return this.up;
-                break;
-            case 'down':
-                return this.down;
-                break;
-            case 'left':
-                return this.left;
-                break;
-            case 'right':
-                return this.right;
-                break;
-            default:
-                return null;
-        }
-    }
-
-    getMoveDir() {
-        return this.#moveSet[this.#moveDir];
-    }
-
-    nextMoveDir() {
-        this.#moveDir++
-        if (this.#moveDir >= this.moveSet.length) {
-            this.#moveDir = 0;
-        }
-        return this.getMoveDir();
-    }
-
     draw() {
         const ctx = this.#canvas.getContext("2d");
+        ctx.imageSmoothingEnabled = false;
         if (ctx) {
             ctx.fillStyle = this.#color;
             ctx.fillRect(this.#rect.x, this.#rect.y, this.#rect.width, this.#rect.height);
-            ctx.fillStyle = "#000000";
+            ctx.strokeStyle = "#FFFFFF";
             ctx.strokeRect(this.#rect.x + 1, this.#rect.y + 1, this.#rect.width - 1, this.#rect.height - 1)
+            ctx.fillStyle = "this.invertColor(this.#color)";
             ctx.fillStyle = this.invertColor(this.#color);
             ctx.fillText(this.#id, this.#rect.x + 3, this.#rect.y + 10);
             ctx.fillText(this.#rect.x + "," + this.#rect.y, this.#rect.x + 3, this.#rect.y + 20);
@@ -133,20 +86,30 @@ class Unit {
         }
     }
 
-    erase() {
-        const ctx = this.#canvas.getContext("2d");
-        if (ctx) {
-            ctx.clearRect(this.#rect.x, this.#rect.y, this.#rect.width, this.#rect.height);
+    move() {
+        if (this.#collider) {
+            this.#collider.rect.x = this.#collider.rect.x + this.moveDir.x;
+            this.#collider.rect.y = this.#collider.rect.y + this.#moveDir.y;
         }
+        this.#rect.x += this.#moveDir.x;
+        this.#rect.y += this.#moveDir.y;
     }
 
-    move(newX, newY) {
-        this.erase();
+    moveTo(newX, newY) {
+        // Calculate the relative movement
+        const deltaX = newX - this.#rect.x;
+        const deltaY = newY - this.#rect.y;
+
+        // Update the unit's position
         this.#rect.x = newX;
         this.#rect.y = newY;
-        this.draw();
-    }
 
+        // If the unit has a collider, move it by the relative values
+        if (this.#collider) {
+            this.#collider.rect.x += deltaX;
+            this.#collider.rect.y += deltaY;
+        }
+    }
 
 
     cast(direction, castDistance, checkUnits) {
